@@ -8,14 +8,33 @@
   // Insert CSS
   const style = document.createElement('style');
   style.textContent = `
-    html.reduce-motion * {
+    /* Accessibility Styles Targeting Only #main-content */
+    #main-content.reduce-motion * {
       animation: none !important;
       transition: none !important;
     }
 
-    html.focus-highlight *:focus {
+    #main-content.focus-highlight *:focus {
       outline: 3px solid #3B82F6 !important;
       outline-offset: 2px;
+    }
+
+    #main-content.high-contrast {
+      background-color: #000000 !important;
+      color: #FFFFFF !important;
+      filter: contrast(1.5) !important;
+    }
+
+    #main-content.large-text {
+      font-size: 1.2em !important;
+    }
+
+    #main-content.readable-fonts {
+      font-family: 'OpenDyslexic', Verdana, Arial, sans-serif !important;
+    }
+
+    #main-content.color-blind {
+      filter: grayscale(1) !important;
     }
 
     #reading-guide {
@@ -40,11 +59,14 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       width: 300px;
       font-family: Arial, sans-serif;
-      z-index: 9999999;
+      z-index: 10000000; /* Ensures the widget stays on top */
       color: #FFF;
       overflow: hidden;
       transition: all 0.3s ease;
       pointer-events: auto;
+      /* Prevent inherited styles */
+      filter: none !important;
+      font-size: 14px !important;
     }
     .compliance-header {
       display: flex;
@@ -143,10 +165,28 @@
   document.body.appendChild(readingGuide);
 
   document.addEventListener('DOMContentLoaded', () => {
+    // Ensure that 'main-content' exists and wrap existing content if necessary
+    (function ensureMainContent() {
+      const existingMainContent = document.getElementById('main-content');
+      if (!existingMainContent) {
+        const mainContent = document.createElement('div');
+        mainContent.id = 'main-content';
+        // Move all existing body children into 'main-content', except the widget and reading guide
+        const children = Array.from(document.body.children);
+        children.forEach(child => {
+          if (child.id !== 'reading-guide' && !child.classList.contains('compliance-widget-container')) {
+            mainContent.appendChild(child);
+          }
+        });
+        document.body.appendChild(mainContent);
+      }
+    })();
+
     class ComplianceWidget {
       constructor() {
         this.isOpen = false; // Start closed (minimized)
         
+        // Accessibility feature states
         this.highContrastEnabled = false;
         this.largeTextEnabled = false;
         this.colorBlindEnabled = false;
@@ -158,7 +198,7 @@
         this.ttsRate = 1.0;
         this.selectedTheme = 'default';
 
-        this.contentElement = document.getElementById('page-content') || document.body;
+        this.contentElement = document.getElementById('main-content');
         this.loadPreferences();
       }
 
@@ -345,7 +385,7 @@
 
         const footer = document.createElement('div');
         footer.classList.add('compliance-footer');
-        footer.innerHTML = `©2024 Coropos Web Services. By Edward Quigley`;
+        footer.innerHTML = `©2024 <a href="https://a11yenhance.coroposws.com/">A11yEnhance</a>. By Edward Quigley`;
 
         this.container.appendChild(header);
         this.container.appendChild(content);
@@ -443,37 +483,37 @@
 
       toggleHighContrast(checked) {
         this.highContrastEnabled = checked;
-        this.applyStyles();
+        this.updateClass('high-contrast', checked);
         this.savePreferences();
       }
 
       toggleLargeText(checked) {
         this.largeTextEnabled = checked;
-        this.applyStyles();
+        this.updateClass('large-text', checked);
         this.savePreferences();
       }
 
       toggleColorBlind(checked) {
         this.colorBlindEnabled = checked;
-        this.applyStyles();
+        this.updateClass('color-blind', checked);
         this.savePreferences();
       }
 
       toggleReadableFonts(checked) {
         this.readableFontsEnabled = checked;
-        this.applyStyles();
+        this.updateClass('readable-fonts', checked);
         this.savePreferences();
       }
 
       toggleFocusHighlight(checked) {
         this.focusHighlightEnabled = checked;
-        this.updateFocusHighlight();
+        this.updateClass('focus-highlight', checked);
         this.savePreferences();
       }
 
       toggleReduceMotion(checked) {
         this.reduceMotionEnabled = checked;
-        this.updateReduceMotion();
+        this.updateClass('reduce-motion', checked);
         this.savePreferences();
       }
 
@@ -483,19 +523,11 @@
         this.savePreferences();
       }
 
-      updateFocusHighlight() {
-        if (this.focusHighlightEnabled) {
-          document.documentElement.classList.add('focus-highlight');
+      updateClass(className, add) {
+        if (add) {
+          this.contentElement.classList.add(className);
         } else {
-          document.documentElement.classList.remove('focus-highlight');
-        }
-      }
-
-      updateReduceMotion() {
-        if (this.reduceMotionEnabled) {
-          document.documentElement.classList.add('reduce-motion');
-        } else {
-          document.documentElement.classList.remove('reduce-motion');
+          this.contentElement.classList.remove(className);
         }
       }
 
@@ -509,47 +541,9 @@
       }
 
       applyStyles() {
-        const currentScroll = window.pageYOffset;
-
+        // Apply theme styles to #main-content
         this.contentElement.style.backgroundColor = '';
         this.contentElement.style.color = '';
-        this.contentElement.style.fontSize = '';
-        this.contentElement.style.fontFamily = '';
-        this.contentElement.style.filter = '';
-
-        this.applyTheme();
-
-        if (this.highContrastEnabled) {
-          this.contentElement.style.backgroundColor = '#000000';
-          this.contentElement.style.color = '#FFFFFF';
-          this.contentElement.style.filter = 'contrast(1.5)';
-        }
-
-        if (this.largeTextEnabled) {
-          this.contentElement.style.fontSize = '1.2em';
-        }
-
-        if (this.readableFontsEnabled) {
-          this.contentElement.style.fontFamily = '"OpenDyslexic", Verdana, Arial, sans-serif';
-        }
-
-        if (this.colorBlindEnabled) {
-          let filters = 'grayscale(1)';
-          if (this.highContrastEnabled) {
-            filters = 'contrast(1.5) grayscale(1)';
-          } else if (this.contentElement.style.filter) {
-            filters = this.contentElement.style.filter + ' grayscale(1)';
-          }
-          this.contentElement.style.filter = filters;
-        }
-
-        window.scrollTo(0, currentScroll);
-      }
-
-      applyTheme() {
-        if (this.selectedTheme === 'default') {
-          return; 
-        }
 
         if (this.selectedTheme === 'sepia') {
           this.contentElement.style.backgroundColor = '#f4ecd8';
@@ -558,11 +552,13 @@
           this.contentElement.style.backgroundColor = '#000000';
           this.contentElement.style.color = '#ffff00';
         }
+
+        // Other styles are applied via classes
       }
 
       textToSpeech() {
         if (!('speechSynthesis' in window)) return;
-        const pageText = document.body.innerText;
+        const pageText = this.contentElement.innerText;
         if (!pageText) return;
 
         const utter = new SpeechSynthesisUtterance(pageText);
